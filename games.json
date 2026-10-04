@@ -1,0 +1,29 @@
+{
+  "siteTitle": "Flash Arcade",
+  "games": [
+    {
+      "id": "arachnid-wars",
+      "title": "Arachnid Wars",
+      "file": "games/arachnid-wars-3156.swf",
+      "width": 800,
+      "height": 600,
+      "description": "Spider-themed battle game."
+    },
+    {
+      "id": "swarm-queen",
+      "title": "Swarm Queen",
+      "file": "games/SwarmQueen.swf",
+      "width": 750,
+      "height": 450,
+      "description": "Lead a swarm as its queen."
+    },
+    {
+      "id": "chibi-knight",
+      "title": "Chibi Knight",
+      "file": "games/chibi-knight-5249.swf",
+      "width": 640,
+      "height": 480,
+      "description": "A small knight on a big quest."
+    }
+  ]
+}

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flash Arcade</title>
+<style>
+  :root {
+    --bg: #131a2e;
+    --panel: #1c2542;
+    --panel-2: #243055;
+    --line: #34426e;
+    --text: #e8ecf8;
+    --muted: #97a3c7;
+    --accent: #ff9f43;
+    --accent-ink: #2a1600;
+    --stage: #070a14;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "side head" "side main";
+  }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  aside {
+    grid-area: side;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    min-height: 0;
+  }
+  .brand { padding: 22px 20px 14px; font-size: 1.5rem; font-weight: 700; letter-spacing: .01em; }
+  .brand small { display: block; font-size: .85rem; font-weight: 400; color: var(--muted); }
+  .search { margin: 0 16px 12px; }
+  .search input {
+    width: 100%; padding: 9px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit;
+  }
+  #list { list-style: none; margin: 0; padding: 0 10px 16px; overflow-y: auto; flex: 1; }
+  #list button {
+    width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+    padding: 10px 12px; border-radius: 8px; display: block;
+  }
+  #list button:hover { background: var(--panel-2); }
+  #list button[aria-current="true"] { background: var(--accent); color: var(--accent-ink); }
+  #list .t { font-weight: 700; }
+  #list .d { font-size: .85rem; color: var(--muted); }
+  #list button[aria-current="true"] .d { color: #5a3300; }
+  .empty { padding: 12px 22px; color: var(--muted); }
+
+  header {
+    grid-area: head;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { margin: 0; font-size: 1.3rem; flex: 1 1 200px; }
+  header .btns { display: flex; gap: 8px; }
+  .btn {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 14px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); }
+
+  main { grid-area: main; padding: 20px 24px 28px; min-height: 0; overflow: auto; }
+  #stage-wrap {
+    background: var(--stage);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    display: grid; place-items: center;
+    width: 100%;
+    max-height: calc(100vh - 170px);
+    aspect-ratio: var(--ar, 4 / 3);
+    margin: 0 auto;
+    overflow: hidden;
+  }
+  #stage { width: 100%; height: 100%; }
+  #stage ruffle-player { width: 100%; height: 100%; display: block; }
+  #msg { color: var(--muted); padding: 24px; text-align: center; max-width: 46ch; }
+  #msg.err { color: #ffb4a8; }
+  #info { margin: 14px auto 0; max-width: 70ch; color: var(--muted); text-align: center; }
+
+  @media (max-width: 760px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; grid-template-areas: "side" "head" "main"; }
+    aside { border-right: 0; border-bottom: 1px solid var(--line); max-height: 40vh; }
+    #stage-wrap { max-height: none; }
+  }
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="brand"><span id="site-title">Flash Arcade</span><small>Runs with Ruffle, no plugin needed</small></div>
+  <div class="search"><input id="q" type="search" placeholder="Search games" aria-label="Search games"></div>
+  <ul id="list"></ul>
+</aside>
+
+<header>
+  <h1 id="game-title">Pick a game</h1>
+  <div class="btns">
+    <button class="btn" id="restart" disabled>Restart</button>
+    <button class="btn" id="full" disabled>Fullscreen</button>
+  </div>
+</header>
+
+<main>
+  <div id="stage-wrap">
+    <div id="stage"><p id="msg">Choose a game from the list to start playing.</p></div>
+  </div>
+  <p id="info"></p>
+</main>
+
+<!-- Self-hosted Ruffle -->
+<script src="ruffle/ruffle.js"></script>
+<script>
+(async () => {
+  const $ = id => document.getElementById(id);
+  let games = [], current = null, player = null;
+
+  try {
+    const res = await fetch('games.json');
+    if (!res.ok) throw new Error('games.json returned ' + res.status);
+    const data = await res.json();
+    games = data.games || [];
+    if (data.siteTitle) { $('site-title').textContent = data.siteTitle; document.title = data.siteTitle; }
+  } catch (e) {
+    showMsg('Could not load games.json. Open this site through a local server (see README), not by double-clicking index.html.', true);
+    return;
+  }
+
+  function showMsg(text, isErr) {
+    $('stage').innerHTML = '';
+    const p = document.createElement('p');
+    p.id = 'msg'; p.textContent = text; if (isErr) p.className = 'err';
+    $('stage').appendChild(p);
+  }
+
+  function renderList(filter = '') {
+    const ul = $('list'); ul.innerHTML = '';
+    const f = filter.trim().toLowerCase();
+    const shown = games.filter(g => !f || (g.title + ' ' + (g.description || '') + ' ' + (g.tags || []).join(' ')).toLowerCase().includes(f));
+    if (!shown.length) { ul.innerHTML = '<li class="empty">No games match.</li>'; return; }
+    for (const g of shown) {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.innerHTML = '<span class="t"></span><span class="d"></span>';
+      b.querySelector('.t').textContent = g.title;
+      b.querySelector('.d').textContent = g.description || '';
+      if (current && current.id === g.id) b.setAttribute('aria-current', 'true');
+      b.onclick = () => { location.hash = g.id; };
+      li.appendChild(b); ul.appendChild(li);
+    }
+  }
+
+  function play(g) {
+    current = g;
+    $('game-title').textContent = g.title;
+    $('info').textContent = g.description || '';
+    $('stage-wrap').style.setProperty('--ar', (g.width || 4) + ' / ' + (g.height || 3));
+    $('restart').disabled = $('full').disabled = false;
+    renderList($('q').value);
+
+    if (!window.RufflePlayer) { showMsg('Ruffle failed to load. Check that the ruffle folder is next to index.html.', true); return; }
+    const ruffle = window.RufflePlayer.newest();
+    if (player) player.remove();
+    $('stage').innerHTML = '';
+    player = ruffle.createPlayer();
+    $('stage').appendChild(player);
+    player.addEventListener('loadedmetadata', () => {}, { once: true });
+    player.load({
+      url: g.file,
+      autoplay: 'auto',
+      unmuteOverlay: 'visible',
+      letterbox: 'on',
+      ...(g.config || {})
+    }).catch(err => showMsg('Could not load ' + g.title + ': ' + (err && err.message || err), true));
+  }
+
+  function route() {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const g = games.find(x => x.id === id);
+    if (g) play(g);
+  }
+
+  $('q').addEventListener('input', e => renderList(e.target.value));
+  $('restart').onclick = () => current && play(current);
+  $('full').onclick = () => {
+    if (!player) return;
+    if (player.enterFullscreen) player.enterFullscreen();
+    else if (player.requestFullscreen) player.requestFullscreen();
+  };
+  window.addEventListener('hashchange', route);
+
+  renderList();
+  route();
+})();
+</script>
+</body>
+</html>
